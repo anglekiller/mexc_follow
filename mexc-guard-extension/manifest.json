@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "MEXC Guard",
+  "version": "1.0.0",
+  "description": "Theo dõi PnL, đóng nhanh vị thế và đặt lệnh MEXC Futures; tin tức giá vàng tiếng Việt và lịch kinh tế.",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_popup": "app.html",
+    "default_title": "MEXC Guard",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
+  },
+  "side_panel": { "default_path": "app.html?panel=1" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["storage", "alarms", "sidePanel", "notifications"],
+  "host_permissions": [
+    "https://api.mexc.com/*",
+    "https://contract.mexc.com/*",
+    "https://news.google.com/*",
+    "https://www.investing.com/*",
+    "https://nfs.faireconomy.media/*"
+  ],
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+}

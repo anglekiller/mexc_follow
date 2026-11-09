@@ -1,0 +1,37 @@
+{
+  "name": "mexc-guard-desktop",
+  "productName": "MEXC Guard",
+  "version": "1.0.0",
+  "description": "MEXC Guard for Windows",
+  "author": "MEXC Guard",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "build": {
+    "appId": "com.tinnt.mexcguard.desktop",
+    "productName": "MEXC Guard",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "web/**/*"
+    ],
+    "win": {
+      "icon": "icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  }
+}

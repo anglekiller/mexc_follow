@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "MEXC Guard",
+    "slug": "mexc-guard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#121212",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.tinnt.mexcguard",
+      "adaptiveIcon": {
+        "backgroundColor": "#121212",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "allowBackup": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-navigation-bar",
+        {
+          "style": "light",
+          "enforceContrast": false
+        }
+      ],
+      "./plugins/withShortCxxPath",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Pnl",
+              "label": "MEXC PnL",
+              "description": "Tổng PnL và lãi/lỗ từng vị thế Futures",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "480dp",
+              "maxResizeHeight": "480dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
+    ]
+  }
+}

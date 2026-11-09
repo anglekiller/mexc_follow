@@ -1,0 +1,40 @@
+# Dependencies and generated folders
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+.metro-health-check*
+*.tsbuildinfo
+
+# Generated native project
+mexc-guard/android/
+mexc-guard/ios/
+mexc-guard/modules/*/android/build/
+
+# Desktop build output
+mexc-guard/desktop/web/
+mexc-guard/desktop/release/
+
+# Build artifacts and logs
+*.apk
+*.aab
+*.exe
+*.blockmap
+*.log
+
+# Secrets
+.env*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# Local tooling
+.claude/
+.DS_Store
+*.orig.*
