@@ -32,8 +32,8 @@ const PERCENTS = [0.1, 0.25, 0.5, 1];
 const RISK_PERCENTS = [0.005, 0.01, 0.02, 0.03];
 
 type OrderKind = 'limit' | 'market';
-/** usdt: margin, cont: order unit, risk: USDT lost if the stop-loss is hit. */
-type Unit = 'usdt' | 'cont' | 'risk';
+/** usdt: margin, coin: số lượng tài sản thực (BTC/XAU/...), risk: USDT chấp nhận lỗ theo SL. */
+type Unit = 'usdt' | 'coin' | 'risk';
 
 const num = (s: string) => {
   const n = parseFloat(s.replace(',', '.'));
@@ -48,7 +48,17 @@ export interface TradePreset {
   tp?: number;
 }
 
-export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: TradePreset | null; onPresetUsed?: () => void }) {
+export function TradeScreen({
+  f,
+  preset,
+  onPresetUsed,
+  onAddKey,
+}: {
+  f: Futures;
+  preset?: TradePreset | null;
+  onPresetUsed?: () => void;
+  onAddKey?: () => void;
+}) {
   const ex = f.api;
   const [symbol, setSymbol] = useState(() => preset?.symbol ?? ex?.defaultSymbols[0] ?? 'BTC_USDT');
   const [recent, setRecent] = useState<string[]>(() =>
@@ -167,8 +177,10 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
   const vol = useMemo(() => {
     if (!contract || px <= 0 || amt <= 0) return 0;
     let raw: number;
-    if (unit === 'cont') raw = amt;
-    else if (unit === 'usdt') raw = (amt * leverage) / (px * contract.contractSize);
+    if (unit === 'coin') {
+      // Người dùng nhập số lượng tài sản thực (vd: 0.01 BTC), convert sang cont.
+      raw = amt / contract.contractSize;
+    } else if (unit === 'usdt') raw = (amt * leverage) / (px * contract.contractSize);
     // Risk per coin at the stop = price distance + open fee + close fee at the stop price.
     else if (slDist > 0) raw = amt / ((slDist + px * openFeeRate + slPrice * closeFeeRate) * contract.contractSize);
     else return 0;
@@ -176,7 +188,8 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
   }, [contract, px, amt, unit, leverage, slDist, slPrice, openFeeRate, closeFeeRate]);
 
   const coinQty = contract ? vol * contract.contractSize : 0;
-  const unitName = contract?.contractSize === 1 ? contract.baseCoin : 'Cont';
+  // Tên đơn vị tài sản thực (BTC, XAU, ETH...)
+  const coinName = contract?.baseCoin ?? 'Coin';
   const notional = coinQty * px;
   const margin = leverage > 0 ? notional / leverage : 0;
   const openFee = notional * openFeeRate;
@@ -281,7 +294,7 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
       `${isLong ? 'Mở Long' : 'Mở Short'} ${pairLabel(symbol)} · ${ex?.name ?? ''}?`,
       [
         `${kind === 'limit' ? `Limit @ ${fmt(order.price, dp)}` : 'Market'} · ${leverage}x ${openType === 1 ? 'Isolated' : 'Cross'}`,
-        contract.contractSize === 1 ? fmtVol(vol, contract) : `${fmtVol(vol, contract)} = ${fmt(coinQty, 6)} ${contract.baseCoin}`,
+        `${fmt(coinQty, contract.volScale ?? 6)} ${contract.baseCoin} (${fmtVol(vol, contract)} cont)`,
         `Giá trị ≈ ${fmt(notional, 2)} USDT · Margin ≈ ${fmt(margin, 2)} USDT`,
         hasFees ? (zeroFee ? 'Phí: 0 (cặp 0 phí)' : `Phí mở ≈ ${fmt(openFee, 4)} USDT (${feePct(openFeeRate)})`) : '',
         tpPrice > 0 ? `TP ${fmt(tpPrice, dp)}` : '',
@@ -469,7 +482,7 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
         <Segmented
           options={[
             { value: 'usdt', label: 'Margin' },
-            { value: 'cont', label: unitName },
+            { value: 'coin', label: coinName },
             { value: 'risk', label: '% Rủi ro' },
           ]}
           value={unit}
@@ -489,7 +502,7 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
               ? `Chấp nhận lỗ (USDT)${equity > 0 && amt > 0 ? ` · ${fmt((amt / equity) * 100, 2)}% vốn` : ''}`
               : unit === 'usdt'
                 ? 'Margin (USDT)'
-                : `Khối lượng (${unitName})`
+                : `Khối lượng (${coinName})`
           }
           value={amount}
           onChange={setAmount}
@@ -524,7 +537,7 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
 
         <View style={styles.summary}>
           <Row label={isRisk ? 'Vốn (equity)' : 'Khả dụng'} value={`${fmt(isRisk ? equity : available, 2)} USDT`} />
-          <Row label="Khối lượng" value={contract?.contractSize === 1 ? fmtVol(vol, contract) : `${fmtVol(vol, contract)} · ${fmt(coinQty, 6)} ${contract?.baseCoin ?? ''}`} />
+          <Row label="Khối lượng" value={vol > 0 ? `${fmt(coinQty, contract?.volScale ?? 6)} ${coinName}` : '—'} />
           <Row label="Giá trị lệnh" value={`${fmt(notional, 2)} USDT`} />
           <Row label="Margin cần" value={`${fmt(margin, 2)} USDT${isRisk ? ` / ${fmt(available, 2)} khả dụng` : ''}`} />
           {hasFees && (
@@ -613,6 +626,13 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
       />
 
       {/* Actions */}
+      {f.guest ? (
+        <View style={styles.actionBar}>
+          <Pressable onPress={onAddKey} style={[styles.sideBtn, { flex: 0, backgroundColor: colors.accent }]}>
+            <Text style={styles.sideText}>Thêm API key để đặt lệnh</Text>
+          </Pressable>
+        </View>
+      ) : (
       <View style={styles.actionBar}>
         {/* Always rendered: the buttons must not shift under the finger when a problem appears. */}
         <Text style={styles.problem} numberOfLines={1} adjustsFontSizeToFit>
@@ -640,6 +660,7 @@ export function TradeScreen({ f, preset, onPresetUsed }: { f: Futures; preset?: 
           ))}
         </View>
       </View>
+      )}
     </View>
   );
 }

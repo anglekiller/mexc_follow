@@ -5,7 +5,30 @@ import type { Candle } from '../api/types';
 import { tap } from '../haptics';
 import { colors, createStyles, fmt, fmtChartTime, sz, useGlass } from '../theme';
 
+/** Tính xu hướng dự đoán từ nến: dựa trên EMA9/EMA21 và momentum gần nhất */
+function calcTrend(candles: Candle[]): 'up' | 'down' | 'flat' {
+  if (candles.length < 22) return 'flat';
+  const closes = candles.map((c) => c.close);
+  // EMA helper
+  const calcEma = (data: number[], period: number) => {
+    const k = 2 / (period + 1);
+    let val = data.slice(0, period).reduce((s, v) => s + v, 0) / period;
+    for (let i = period; i < data.length; i++) val = data[i] * k + val * (1 - k);
+    return val;
+  };
+  const ema9  = calcEma(closes, 9);
+  const ema21 = calcEma(closes, 21);
+  // Momentum: slope of last 3 closes
+  const n = closes.length;
+  const slope = closes[n - 1] - closes[n - 4];
+  const pct = closes[n - 1] > 0 ? slope / closes[n - 1] : 0;
+  if (ema9 > ema21 && pct > 0.001) return 'up';
+  if (ema9 < ema21 && pct < -0.001) return 'down';
+  return 'flat';
+}
+
 export type ChartType = 'candle' | 'bar' | 'line';
+export type TrendArrow = 'up' | 'down' | 'flat';
 
 const CHART_TYPES: { value: ChartType; label: string }[] = [
   { value: 'candle', label: 'Nến' },
@@ -194,6 +217,9 @@ export const PriceChart = memo(function PriceChart({
 
   const last = visible[visible.length - 1];
   const crossIdx = cross ? clamp(Math.floor(cross.x / step), 0, visible.length - 1) : -1;
+
+  // Tính xu hướng dự đoán từ toàn bộ chuỗi nến (không chỉ visible)
+  const trend = useMemo(() => calcTrend(candles), [candles]);
   const info = crossIdx >= 0 ? visible[crossIdx] : last;
   const axis = [0, 0.25, 0.5, 0.75, 1].map((t) => hi - (hi - lo) * t);
   const timeTicks = visible.length > 4 ? [0.15, 0.5, 0.85].map((t) => Math.floor(t * (visible.length - 1))) : [];
@@ -339,6 +365,77 @@ export const PriceChart = memo(function PriceChart({
                 </View>
               )}
 
+              {/* Trend arrow — mũi tên dự đoán xu hướng ở cuối chart */}
+              {last && off === 0 && trend !== 'flat' && (() => {
+                const arrowColor = trend === 'up' ? colors.long : colors.short;
+                const lastY = y(last.close);
+                // Vị trí mũi tên: sau cây nến cuối, bên trong plotW
+                const arrowX = Math.min(visible.length * step, plotW - sz(56));
+                // Mũi tên: thân dọc + đầu mũi tên hình tam giác bằng View
+                const arrowLen = sz(36);
+                const isUp = trend === 'up';
+                const bodyTop = isUp ? lastY - arrowLen : lastY;
+                return (
+                  <View key="trend-arrow" pointerEvents="none">
+                    {/* Nhãn xu hướng */}
+                    <View
+                      style={[
+                        styles.trendBadge,
+                        {
+                          left: arrowX,
+                          top: isUp ? lastY - arrowLen - sz(22) : lastY + arrowLen + sz(2),
+                          backgroundColor: arrowColor + '28',
+                          borderColor: arrowColor,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.trendBadgeText, { color: arrowColor }]}>
+                        {isUp ? '▲ TĂNG' : '▼ GIẢM'}
+                      </Text>
+                    </View>
+                    {/* Thân mũi tên */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: arrowX + sz(10),
+                        top: bodyTop,
+                        width: sz(2),
+                        height: arrowLen,
+                        backgroundColor: arrowColor,
+                      }}
+                    />
+                    {/* Đầu mũi tên */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: arrowX + sz(10) - sz(5),
+                        top: isUp ? lastY - arrowLen - sz(8) : lastY + arrowLen,
+                        width: 0,
+                        height: 0,
+                        borderLeftWidth: sz(6),
+                        borderRightWidth: sz(6),
+                        borderLeftColor: 'transparent',
+                        borderRightColor: 'transparent',
+                        ...(isUp
+                          ? { borderBottomWidth: sz(8), borderBottomColor: arrowColor }
+                          : { borderTopWidth: sz(8), borderTopColor: arrowColor }),
+                      }}
+                    />
+                    {/* Đường ngang từ nến cuối đến mũi tên */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        left: visible.length * step - step / 2,
+                        top: lastY,
+                        width: Math.max(arrowX + sz(11) - (visible.length * step - step / 2), 0),
+                        height: 1,
+                        backgroundColor: arrowColor + '80',
+                      }}
+                    />
+                  </View>
+                );
+              })()}
+
               {/* Crosshair */}
               {cross && crossIdx >= 0 && (
                 <>
@@ -463,4 +560,14 @@ const styles = createStyles({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  trendBadge: {
+    position: 'absolute',
+    paddingHorizontal: sz(6),
+    paddingVertical: sz(2),
+    borderRadius: 4,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trendBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
 });
